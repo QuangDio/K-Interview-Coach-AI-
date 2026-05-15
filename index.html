@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>K-Interview Coach AI</title>
+    <link rel="stylesheet" href="./styles.css?v=6" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">AI</div>
+          <div>
+            <strong>K-Interview Coach AI</strong>
+            <span>English prep for global teams</span>
+          </div>
+        </div>
+
+        <nav class="nav">
+          <button class="nav-item active" data-view="dashboard" type="button">
+            <span class="icon">⌂</span>
+            Dashboard
+          </button>
+          <button class="nav-item" data-view="setup" type="button">
+            <span class="icon">＋</span>
+            New Interview
+          </button>
+          <button class="nav-item" data-view="history" type="button">
+            <span class="icon">◷</span>
+            History
+          </button>
+        </nav>
+
+        <div class="sidebar-note">
+          <span class="status-dot"></span>
+          MVP local mode. Data is saved in this browser.
+        </div>
+      </aside>
+
+      <main class="main">
+        <section id="dashboardView" class="view active-view">
+          <header class="topbar">
+            <div>
+              <p class="eyebrow">Practice workspace</p>
+              <h1>K-Interview Coach AI</h1>
+            </div>
+            <button id="newInterviewTop" class="primary-btn" type="button">Start Interview</button>
+          </header>
+
+          <div class="dashboard-grid">
+            <section class="panel overview-panel">
+              <div>
+                <p class="eyebrow">Korean interview simulator</p>
+                <h2>Practice English interviews, camera presence, and Korean company culture in one room.</h2>
+                <p class="muted">K-Interview Coach AI helps candidates rehearse realistic HR, English, culture, and technical interview questions before applying to Korean teams.</p>
+                <button id="homeStartPractice" class="primary-btn" type="button">Start Practice</button>
+              </div>
+              <div class="coach-visual" aria-hidden="true">
+                <div class="avatar">
+                  <div class="avatar-face"></div>
+                  <div class="avatar-body"></div>
+                </div>
+                <div class="wave-bars">
+                  <span></span><span></span><span></span><span></span><span></span>
+                </div>
+              </div>
+            </section>
+
+            <section class="metric-row">
+              <article class="metric">
+                <span id="metricSessions">0</span>
+                <p>Sessions</p>
+              </article>
+              <article class="metric">
+                <span id="metricAverage">--</span>
+                <p>Average score</p>
+              </article>
+              <article class="metric">
+                <span id="metricBest">--</span>
+                <p>Best score</p>
+              </article>
+            </section>
+
+            <section class="panel dashboard-camera-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Body language camera</p>
+                  <h2>Check your hands and posture before the interview.</h2>
+                </div>
+              </div>
+              <div class="camera-coach">
+                <div class="camera-preview-wrap">
+                  <video id="dashboardCameraPreview" autoplay playsinline muted hidden></video>
+                  <div id="dashboardCameraPlaceholder" class="camera-placeholder">
+                    <span>Camera off</span>
+                  </div>
+                </div>
+                <div class="camera-coach-content">
+                  <ul class="gesture-list">
+                    <li>Keep hands inside the camera frame.</li>
+                    <li>Use small, calm gestures when making key points.</li>
+                    <li>Relax your shoulders and pause between ideas.</li>
+                  </ul>
+                  <div class="camera-actions">
+                    <button id="dashboardCameraToggle" class="secondary-btn" type="button">Turn Camera On</button>
+                    <span id="dashboardCameraStatus" class="muted">Camera is off.</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Product benefits</p>
+                  <h2>What you improve before the real interview</h2>
+                </div>
+              </div>
+              <div class="roadmap">
+                <div class="step done"><span>1</span><p>Practice interview answers with AI prompts</p></div>
+                <div class="step done"><span>2</span><p>Improve spoken English and STAR structure</p></div>
+                <div class="step done"><span>3</span><p>Check camera posture and gesture rhythm</p></div>
+                <div class="step done"><span>4</span><p>Learn Korean company culture expectations</p></div>
+              </div>
+            </section>
+
+            <section class="panel quest-demo-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Repair quest preview</p>
+                  <h2>Fix mistakes, earn XP, unlock the next issue.</h2>
+                </div>
+                <button id="loadDemoReport" class="secondary-btn" type="button">Open Demo Report</button>
+              </div>
+              <div class="mini-quest-grid">
+                <div><strong>+15 XP</strong><span>Too short</span></div>
+                <div><strong>+12 XP</strong><span>Weak STAR</span></div>
+                <div><strong>Combo</strong><span>Every 3 fixes</span></div>
+                <div><strong>x2</strong><span>High-score bonus</span></div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Recent sessions</p>
+                  <h2>Latest practice reports</h2>
+                </div>
+              </div>
+              <div id="recentSessions" class="session-list empty-state"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="setupView" class="view">
+          <header class="topbar compact">
+            <div>
+              <p class="eyebrow">New interview</p>
+              <h1>Set up your mock interview</h1>
+            </div>
+          </header>
+
+          <form id="setupForm" class="setup-layout">
+            <section class="panel form-panel">
+              <label>
+                Role title
+                <input id="roleTitle" name="roleTitle" value="Senior Frontend Developer" required />
+              </label>
+
+              <div class="two-col">
+                <label>
+                  Seniority
+                  <select id="seniority" name="seniority">
+                    <option value="junior">Junior</option>
+                    <option value="middle">Middle</option>
+                    <option value="senior" selected>Senior</option>
+                    <option value="lead">Lead</option>
+                  </select>
+                </label>
+
+                <label>
+                  Interview style
+                  <select id="targetStyle" name="targetStyle">
+                    <option value="korean_company" selected>Korean company</option>
+                    <option value="global_startup">Global startup</option>
+                    <option value="japanese_company">Japanese company</option>
+                    <option value="us_eu_company">US/EU company</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="two-col">
+                <label>
+                  Language
+                  <select id="practiceLanguage" name="practiceLanguage">
+                    <option value="english" selected>English</option>
+                    <option value="korean">Korean</option>
+                    <option value="mixed">English + Korean culture</option>
+                  </select>
+                </label>
+
+                <label>
+                  Difficulty
+                  <select id="difficulty" name="difficulty">
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate" selected>Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </select>
+                </label>
+              </div>
+
+              <label>
+                Interview type
+                <select id="interviewType" name="interviewType">
+                  <option value="hr" selected>HR Interview</option>
+                  <option value="english">English Interview</option>
+                  <option value="korean_culture">Korean Company Culture Interview</option>
+                  <option value="technical">Technical Interview</option>
+                </select>
+              </label>
+
+              <label>
+                Job description
+                <textarea id="jobDescription" rows="5" placeholder="Paste the job description here..."></textarea>
+              </label>
+
+              <label>
+                CV or profile summary
+                <textarea id="cvText" rows="5" placeholder="Paste your CV summary or key experience..."></textarea>
+              </label>
+
+              <button class="primary-btn wide" type="submit">Generate Interview</button>
+            </section>
+
+            <aside class="panel setup-guide">
+              <p class="eyebrow">Rubric</p>
+              <h2>What the coach will evaluate</h2>
+              <ul class="check-list">
+                <li>Answer content: 25 points</li>
+                <li>English quality: 20 points</li>
+                <li>Answer structure: 15 points</li>
+                <li>Speaking confidence: 15 points</li>
+                <li>Camera behavior: 10 points</li>
+                <li>Korean culture fit: 15 points</li>
+              </ul>
+            </aside>
+          </form>
+        </section>
+
+        <section id="interviewView" class="view">
+          <header class="interview-header">
+            <div>
+              <p id="sessionMeta" class="eyebrow">Interview session</p>
+              <h1 id="questionTitle">Question</h1>
+            </div>
+            <div class="progress-wrap">
+              <span id="questionTimer">00:00</span>
+              <span id="progressText">1/5</span>
+              <div class="progress-track"><div id="progressBar"></div></div>
+            </div>
+          </header>
+
+          <section class="interview-room">
+            <div class="interviewer">
+              <div class="interviewer-card">
+                <div class="avatar large">
+                  <div class="avatar-face"></div>
+                  <div class="avatar-body"></div>
+                </div>
+                <div class="wave-bars live" aria-hidden="true">
+                  <span></span><span></span><span></span><span></span><span></span>
+                </div>
+                <button id="speakQuestion" class="secondary-btn" type="button">Play Question</button>
+              </div>
+              <div class="question-box">
+                <p id="questionType" class="eyebrow">Behavioral</p>
+                <h2 id="questionText"></h2>
+                <p id="expectedSignal" class="muted"></p>
+              </div>
+            </div>
+
+            <div class="answer-panel">
+              <div class="voice-mode-card">
+                <div>
+                  <p class="eyebrow">Voice interview mode</p>
+                  <h2>Let AI ask, then answer by speaking.</h2>
+                  <p class="muted">The browser will request microphone permission. Live transcript depends on browser speech support.</p>
+                </div>
+                <button id="voiceInterviewBtn" class="primary-btn" type="button">Ask & Start Speaking</button>
+              </div>
+
+              <div class="record-strip">
+                <button id="recordBtn" class="record-btn" type="button">
+                  <span></span>
+                  Record
+                </button>
+                <button id="stopBtn" class="secondary-btn" type="button" disabled>Stop</button>
+                <span id="recordState" class="muted">Use audio or type your answer.</span>
+              </div>
+
+              <audio id="answerAudio" controls hidden></audio>
+
+              <section class="camera-coach interview-camera" aria-label="Camera body language coach">
+                <div class="camera-preview-wrap">
+                  <video id="cameraPreview" autoplay playsinline muted hidden></video>
+                  <div id="cameraPlaceholder" class="camera-placeholder">
+                    <span>Camera off</span>
+                  </div>
+                </div>
+                <div class="camera-coach-content">
+                  <div class="camera-copy">
+                    <p class="eyebrow">Body language</p>
+                    <h3>Natural hand movement</h3>
+                  </div>
+                  <ul class="gesture-list">
+                    <li>Hands visible</li>
+                    <li>Small open gestures</li>
+                    <li>Relax after each point</li>
+                    <li>Look at camera</li>
+                  </ul>
+                  <div class="camera-actions">
+                    <button id="cameraToggle" class="secondary-btn" type="button">Turn Camera On</button>
+                    <span id="cameraStatus" class="muted">Camera is off.</span>
+                  </div>
+                  <div class="gesture-coach" aria-live="polite">
+                    <div class="gesture-score">
+                      <strong id="gestureScore">--</strong>
+                      <span>Movement score</span>
+                    </div>
+                    <div class="gesture-readout">
+                      <div class="gesture-meter"><span id="gestureMeter"></span></div>
+                      <strong id="gestureFeedback">Turn on camera to get movement feedback.</strong>
+                      <p id="gestureDetail" class="muted">The coach estimates gesture rhythm from local camera frames.</p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <label>
+                Transcript / answer
+                <textarea id="answerText" rows="9" placeholder="Type your answer here, or edit the transcript after recording..."></textarea>
+              </label>
+
+              <div class="actions-row">
+                <button id="saveAnswer" class="primary-btn" type="button">Save & Next</button>
+                <button id="finishInterview" class="secondary-btn" type="button">Finish & Review Quests</button>
+                <button id="loadDemoFromInterview" class="secondary-btn" type="button">Open Demo Report</button>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section id="reportView" class="view">
+          <header class="topbar compact">
+            <div>
+              <p class="eyebrow">Interview report</p>
+              <h1>Feedback summary</h1>
+            </div>
+            <button id="backToDashboard" class="secondary-btn" type="button">Dashboard</button>
+          </header>
+
+          <div id="reportContent" class="report-layout"></div>
+        </section>
+
+        <section id="historyView" class="view">
+          <header class="topbar compact">
+            <div>
+              <p class="eyebrow">History</p>
+              <h1>Saved interview sessions</h1>
+            </div>
+            <button id="clearHistory" class="danger-btn" type="button">Clear History</button>
+          </header>
+          <div id="historyList" class="session-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js?v=6"></script>
+  </body>
+</html>
