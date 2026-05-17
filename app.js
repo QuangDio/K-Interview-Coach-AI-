@@ -1,7 +1,45 @@
 const STORAGE_KEY = "ai-interview-coach-sessions-v1";
+const PROFILE_KEY = "ai-interview-coach-profile-v1";
+const THEME_KEY = "ai-interview-coach-theme-v1";
+
+const shopItems = [
+  {
+    id: "star_booster",
+    title: "STAR Answer Booster",
+    badge: "Template",
+    cost: 90,
+    description: "Unlock a polished STAR answer structure for your next interview practice.",
+    effect: "Adds a reusable Situation, Task, Action, Result checklist to your training plan.",
+  },
+  {
+    id: "culture_pack",
+    title: "K-Culture Prep Pack",
+    badge: "Culture",
+    cost: 120,
+    description: "Redeem a focused Korean company culture checklist before the next session.",
+    effect: "Helps you prepare respectful communication, reporting style, and ownership examples.",
+  },
+  {
+    id: "confidence_drill",
+    title: "Confidence Drill",
+    badge: "Voice",
+    cost: 150,
+    description: "Unlock a speaking drill designed for shorter, calmer, more confident answers.",
+    effect: "Gives you a 60-second warm-up routine before recording the next answer.",
+  },
+  {
+    id: "mock_upgrade",
+    title: "Premium Mock Scenario",
+    badge: "Scenario",
+    cost: 220,
+    description: "Redeem a tougher follow-up scenario for senior-level interview practice.",
+    effect: "Adds a pressure-style prompt focused on trade-offs, stakeholders, and measurable impact.",
+  },
+];
 
 const state = {
   sessions: loadSessions(),
+  profile: loadProfile(),
   activeSession: null,
   reportSession: null,
   activeQuestionIndex: 0,
@@ -14,7 +52,17 @@ const state = {
     canvas: document.createElement("canvas"),
     previousFrame: null,
     samples: [],
+    faceDetector: null,
+    bodySamples: [],
     lastUpdate: 0,
+  },
+  voiceCoach: {
+    frameId: null,
+    audioContext: null,
+    analyser: null,
+    dataArray: null,
+    samples: [],
+    startedAt: null,
   },
   audioChunks: [],
   recognition: null,
@@ -23,6 +71,7 @@ const state = {
   recognitionFinalTranscript: "",
   questionStartedAt: null,
   questionTimer: null,
+  theme: loadTheme(),
 };
 
 const questionBank = {
@@ -151,12 +200,14 @@ const els = {
   interviewView: document.getElementById("interviewView"),
   reportView: document.getElementById("reportView"),
   historyView: document.getElementById("historyView"),
+  shopView: document.getElementById("shopView"),
   setupForm: document.getElementById("setupForm"),
   newInterviewTop: document.getElementById("newInterviewTop"),
   homeStartPractice: document.getElementById("homeStartPractice"),
   metricSessions: document.getElementById("metricSessions"),
   metricAverage: document.getElementById("metricAverage"),
   metricBest: document.getElementById("metricBest"),
+  dashboardShopBalance: document.getElementById("dashboardShopBalance"),
   recentSessions: document.getElementById("recentSessions"),
   dashboardCameraPreview: document.getElementById("dashboardCameraPreview"),
   dashboardCameraPlaceholder: document.getElementById("dashboardCameraPlaceholder"),
@@ -189,17 +240,40 @@ const els = {
   gestureMeter: document.getElementById("gestureMeter"),
   gestureFeedback: document.getElementById("gestureFeedback"),
   gestureDetail: document.getElementById("gestureDetail"),
+  speakingSpeed: document.getElementById("speakingSpeed"),
+  speakingSpeedFeedback: document.getElementById("speakingSpeedFeedback"),
+  voiceVolume: document.getElementById("voiceVolume"),
+  voiceVolumeMeter: document.getElementById("voiceVolumeMeter"),
+  voiceVolumeFeedback: document.getElementById("voiceVolumeFeedback"),
+  voiceConfidence: document.getElementById("voiceConfidence"),
+  voiceConfidenceMeter: document.getElementById("voiceConfidenceMeter"),
+  voiceConfidenceFeedback: document.getElementById("voiceConfidenceFeedback"),
+  voiceConfidenceBadge: document.getElementById("voiceConfidenceBadge"),
+  bodyLanguageBadge: document.getElementById("bodyLanguageBadge"),
+  lookingAwaySignal: document.getElementById("lookingAwaySignal"),
+  lookingDownSignal: document.getElementById("lookingDownSignal"),
+  nervousMovementSignal: document.getElementById("nervousMovementSignal"),
+  facialExpressionSignal: document.getElementById("facialExpressionSignal"),
+  bodyLanguageDetail: document.getElementById("bodyLanguageDetail"),
   saveAnswer: document.getElementById("saveAnswer"),
   finishInterview: document.getElementById("finishInterview"),
   reportContent: document.getElementById("reportContent"),
+  shopContent: document.getElementById("shopContent"),
+  themeToggle: document.getElementById("themeToggle"),
+  themeToggleText: document.getElementById("themeToggleText"),
   backToDashboard: document.getElementById("backToDashboard"),
 };
 
 init();
 
 function init() {
+  applyTheme(state.theme);
+
   els.navItems.forEach((item) => {
     item.addEventListener("click", () => showView(item.dataset.view));
+  });
+  document.querySelectorAll("[data-view-target]").forEach((item) => {
+    item.addEventListener("click", () => showView(item.dataset.viewTarget));
   });
 
   els.newInterviewTop?.addEventListener("click", () => showView("setup"));
@@ -216,6 +290,8 @@ function init() {
   els.finishInterview?.addEventListener("click", finishInterview);
   els.clearHistory?.addEventListener("click", clearHistory);
   els.reportContent?.addEventListener("click", handleReportClick);
+  els.shopContent?.addEventListener("click", handleReportClick);
+  els.themeToggle?.addEventListener("click", toggleTheme);
   els.loadDemoReport?.addEventListener("click", loadDemoReport);
   els.loadDemoFromInterview?.addEventListener("click", loadDemoReport);
 
@@ -232,6 +308,7 @@ function showView(viewName) {
 
   if (viewName === "dashboard") renderDashboard();
   if (viewName === "history") renderHistory();
+  if (viewName === "shop") renderShop();
 }
 
 function startInterview(event) {
@@ -330,6 +407,7 @@ function renderQuestion() {
   els.answerAudio.hidden = true;
   els.answerAudio.removeAttribute("src");
   els.recordState.textContent = "Use audio or type your answer.";
+  resetVoiceAnalysis();
   els.cameraStatus.textContent =
     state.cameraStream && state.cameraContext === "interview"
       ? "Camera is on. Keep your hands inside the frame."
@@ -446,6 +524,7 @@ async function startRecording(options = {}) {
       return;
     }
 
+    startVoiceAnalysis(stream);
     state.mediaRecorder.start(250);
     els.recordState.textContent = "Recording. Speak now.";
   } catch (error) {
@@ -459,6 +538,7 @@ function stopRecording() {
   if (state.mediaRecorder?.state === "recording") {
     state.mediaRecorder.stop();
   }
+  stopVoiceAnalysis({ finalize: true });
   stopBrowserSpeechRecognition();
   els.recordBtn.classList.remove("recording");
   els.recordBtn.disabled = false;
@@ -484,9 +564,135 @@ function prepareMicrophoneStream() {
 }
 
 function releaseMicrophoneStream() {
+  stopVoiceAnalysis();
   if (!state.micStream) return;
   state.micStream.getTracks().forEach((track) => track.stop());
   state.micStream = null;
+}
+
+function startVoiceAnalysis(stream) {
+  stopVoiceAnalysis();
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext || !stream) {
+    updateVoiceAnalysis({
+      volumeLabel: "Unavailable",
+      volumeMeter: 0,
+      speedLabel: "-- WPM",
+      speedFeedback: "Voice analysis is not supported in this browser.",
+      confidenceLabel: "--",
+      confidenceMeter: 0,
+      confidenceFeedback: "Use a browser with Web Audio support for voice analysis.",
+      badge: "Unavailable",
+    });
+    return;
+  }
+
+  const audioContext = new AudioContext();
+  const analyser = audioContext.createAnalyser();
+  analyser.fftSize = 1024;
+  const source = audioContext.createMediaStreamSource(stream);
+  source.connect(analyser);
+
+  state.voiceCoach.audioContext = audioContext;
+  state.voiceCoach.analyser = analyser;
+  state.voiceCoach.dataArray = new Uint8Array(analyser.fftSize);
+  state.voiceCoach.samples = [];
+  state.voiceCoach.startedAt = Date.now();
+
+  const analyze = () => {
+    state.voiceCoach.frameId = requestAnimationFrame(analyze);
+    analyser.getByteTimeDomainData(state.voiceCoach.dataArray);
+    const rms = calculateRms(state.voiceCoach.dataArray);
+    state.voiceCoach.samples.push(rms);
+    if (state.voiceCoach.samples.length > 240) state.voiceCoach.samples.shift();
+    updateVoiceAnalysis(buildVoiceAnalysis());
+  };
+
+  state.voiceCoach.frameId = requestAnimationFrame(analyze);
+}
+
+function stopVoiceAnalysis(options = {}) {
+  if (options.finalize && state.voiceCoach.startedAt) {
+    updateVoiceAnalysis(buildVoiceAnalysis({ final: true }));
+  }
+
+  if (state.voiceCoach.frameId) cancelAnimationFrame(state.voiceCoach.frameId);
+  state.voiceCoach.frameId = null;
+  state.voiceCoach.analyser = null;
+  state.voiceCoach.dataArray = null;
+  state.voiceCoach.startedAt = null;
+
+  if (state.voiceCoach.audioContext) {
+    state.voiceCoach.audioContext.close().catch(() => {});
+  }
+  state.voiceCoach.audioContext = null;
+}
+
+function resetVoiceAnalysis() {
+  stopVoiceAnalysis();
+  state.voiceCoach.samples = [];
+  updateVoiceAnalysis({
+    volumeLabel: "--",
+    volumeMeter: 0,
+    volumeFeedback: "Microphone volume will appear while recording.",
+    speedLabel: "-- WPM",
+    speedFeedback: "Record your answer to calculate words per minute.",
+    confidenceLabel: "--",
+    confidenceMeter: 0,
+    confidenceFeedback: "Confidence combines pace, volume, filler words, and answer length.",
+    badge: "Waiting",
+  });
+}
+
+function calculateRms(dataArray) {
+  let sum = 0;
+  for (let i = 0; i < dataArray.length; i += 1) {
+    const centered = (dataArray[i] - 128) / 128;
+    sum += centered * centered;
+  }
+  return Math.sqrt(sum / dataArray.length);
+}
+
+function buildVoiceAnalysis(options = {}) {
+  const samples = state.voiceCoach.samples || [];
+  const avgVolume = samples.length ? average(samples) : 0;
+  const peakVolume = samples.length ? Math.max(...samples) : 0;
+  const transcript = els.answerText?.value.trim() || "";
+  const wordCount = transcript.split(/\s+/).filter(Boolean).length;
+  const elapsedSeconds = state.voiceCoach.startedAt
+    ? Math.max(1, Math.floor((Date.now() - state.voiceCoach.startedAt) / 1000))
+    : Math.max(1, state.questionStartedAt ? Math.floor((Date.now() - state.questionStartedAt) / 1000) : 1);
+  const wpm = wordCount ? Math.round((wordCount / elapsedSeconds) * 60) : 0;
+  const fillerCount = fillerPenalty(transcript.toLowerCase());
+  const volumeScore = Math.max(0, Math.min(100, Math.round(avgVolume * 420)));
+  const speedScore = wpm >= 95 && wpm <= 165 ? 100 : wpm < 95 ? Math.max(35, Math.round((wpm / 95) * 100)) : Math.max(35, 100 - Math.round((wpm - 165) * 1.6));
+  const lengthScore = Math.min(100, wordCount * 3);
+  const confidence = Math.max(1, Math.min(100, Math.round(speedScore * 0.38 + volumeScore * 0.34 + lengthScore * 0.2 - fillerCount * 6 + (peakVolume > 0.04 ? 8 : 0))));
+
+  return {
+    volumeLabel: volumeScore < 25 ? "Low" : volumeScore > 78 ? "Loud" : "Good",
+    volumeMeter: volumeScore,
+    volumeFeedback: volumeScore < 25 ? "Speak a little louder and closer to the microphone." : volumeScore > 78 ? "Lower your volume slightly to sound calmer." : "Volume is clear for an online interview.",
+    speedLabel: wpm ? `${wpm} WPM` : "-- WPM",
+    speedFeedback: !wpm ? "Start speaking to calculate pace." : wpm < 95 ? "Pace is slow. Add more complete examples." : wpm > 165 ? "Pace is fast. Slow down and pause between ideas." : "Pace is in a professional interview range.",
+    confidenceLabel: confidence >= 76 ? "High" : confidence >= 52 ? "Medium" : "Low",
+    confidenceMeter: confidence,
+    confidenceFeedback: confidence >= 76 ? "Confident delivery. Keep this pace and volume." : confidence >= 52 ? "Usable delivery. Reduce fillers and keep examples concrete." : "Confidence sounds low. Speak louder, answer longer, and reduce fillers.",
+    badge: options.final ? "Saved" : "Live",
+  };
+}
+
+function updateVoiceAnalysis(result) {
+  if (!result) return;
+  if (els.voiceVolume) els.voiceVolume.textContent = result.volumeLabel;
+  if (els.voiceVolumeMeter) els.voiceVolumeMeter.style.width = `${result.volumeMeter || 0}%`;
+  if (els.voiceVolumeFeedback) els.voiceVolumeFeedback.textContent = result.volumeFeedback || "";
+  if (els.speakingSpeed) els.speakingSpeed.textContent = result.speedLabel;
+  if (els.speakingSpeedFeedback) els.speakingSpeedFeedback.textContent = result.speedFeedback || "";
+  if (els.voiceConfidence) els.voiceConfidence.textContent = result.confidenceLabel;
+  if (els.voiceConfidenceMeter) els.voiceConfidenceMeter.style.width = `${result.confidenceMeter || 0}%`;
+  if (els.voiceConfidenceFeedback) els.voiceConfidenceFeedback.textContent = result.confidenceFeedback || "";
+  if (els.voiceConfidenceBadge) els.voiceConfidenceBadge.textContent = result.badge;
 }
 
 function startBrowserSpeechRecognition(options = {}) {
@@ -638,14 +844,30 @@ function startMotionCoach(video) {
   stopMotionCoach();
   state.motionCoach.previousFrame = null;
   state.motionCoach.samples = [];
+  state.motionCoach.bodySamples = [];
+  if ("FaceDetector" in window) {
+    state.motionCoach.faceDetector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+  } else {
+    state.motionCoach.faceDetector = null;
+  }
   updateGestureFeedback({
     score: "--",
     meter: 0,
     feedback: "Watching your gesture rhythm...",
     detail: "Answer normally for a few seconds so the coach can estimate your movement.",
   });
+  updateBodyLanguageFeedback({
+    badge: "Live",
+    lookingAway: "Calibrating",
+    lookingDown: "Calibrating",
+    nervousMovement: "Calibrating",
+    facialExpression: state.motionCoach.faceDetector ? "Calibrating" : "Face API unavailable",
+    detail: state.motionCoach.faceDetector
+      ? "Keep your face centered and answer naturally for a few seconds."
+      : "This browser does not expose face detection. Movement analysis still works.",
+  });
 
-  const analyze = (time) => {
+  const analyze = async (time) => {
     state.motionCoach.frameId = requestAnimationFrame(analyze);
     if (time - state.motionCoach.lastUpdate < 260 || video.readyState < 2) return;
     state.motionCoach.lastUpdate = time;
@@ -656,6 +878,10 @@ function startMotionCoach(video) {
     if (state.motionCoach.samples.length > 18) state.motionCoach.samples.shift();
 
     updateGestureFeedback(buildGestureFeedback(state.motionCoach.samples));
+    const bodySample = await readBodyLanguageSample(video, sample);
+    state.motionCoach.bodySamples.push(bodySample);
+    if (state.motionCoach.bodySamples.length > 20) state.motionCoach.bodySamples.shift();
+    updateBodyLanguageFeedback(buildBodyLanguageFeedback(state.motionCoach.bodySamples));
   };
 
   state.motionCoach.frameId = requestAnimationFrame(analyze);
@@ -666,11 +892,21 @@ function stopMotionCoach() {
   state.motionCoach.frameId = null;
   state.motionCoach.previousFrame = null;
   state.motionCoach.samples = [];
+  state.motionCoach.bodySamples = [];
+  state.motionCoach.faceDetector = null;
   updateGestureFeedback({
     score: "--",
     meter: 0,
     feedback: "Turn on camera to get movement feedback.",
     detail: "The coach estimates gesture rhythm from local camera frames.",
+  });
+  updateBodyLanguageFeedback({
+    badge: "Camera off",
+    lookingAway: "--",
+    lookingDown: "--",
+    nervousMovement: "--",
+    facialExpression: "--",
+    detail: "Turn on camera to start local body language analysis.",
   });
 }
 
@@ -770,6 +1006,86 @@ function updateGestureFeedback(result) {
   els.gestureMeter.style.width = `${result.meter}%`;
   els.gestureFeedback.textContent = result.feedback;
   els.gestureDetail.textContent = result.detail;
+}
+
+async function readBodyLanguageSample(video, motionSample) {
+  const sample = {
+    faceVisible: false,
+    faceCenterX: 0.5,
+    faceCenterY: 0.42,
+    faceSize: 0,
+    movement: motionSample.movement,
+    activeRatio: motionSample.activeRatio,
+    edgeRatio: motionSample.edgeRatio,
+    handZoneRatio: motionSample.handZoneRatio,
+  };
+
+  if (!state.motionCoach.faceDetector) return sample;
+
+  try {
+    const faces = await state.motionCoach.faceDetector.detect(video);
+    const face = faces[0];
+    if (!face?.boundingBox) return sample;
+    const box = face.boundingBox;
+    sample.faceVisible = true;
+    sample.faceCenterX = (box.x + box.width / 2) / video.videoWidth;
+    sample.faceCenterY = (box.y + box.height / 2) / video.videoHeight;
+    sample.faceSize = (box.width * box.height) / (video.videoWidth * video.videoHeight);
+  } catch {
+    state.motionCoach.faceDetector = null;
+  }
+
+  return sample;
+}
+
+function buildBodyLanguageFeedback(samples) {
+  if (!samples.length) {
+    return {
+      badge: "Live",
+      lookingAway: "Calibrating",
+      lookingDown: "Calibrating",
+      nervousMovement: "Calibrating",
+      facialExpression: "Calibrating",
+      detail: "Keep your face centered and answer naturally for a few seconds.",
+    };
+  }
+
+  const faceSamples = samples.filter((sample) => sample.faceVisible);
+  const hasFaceApi = Boolean(state.motionCoach.faceDetector) || faceSamples.length > 0;
+  const awayRatio = hasFaceApi
+    ? samples.filter((sample) => !sample.faceVisible || sample.faceCenterX < 0.34 || sample.faceCenterX > 0.66).length / samples.length
+    : 0;
+  const downRatio = hasFaceApi
+    ? faceSamples.filter((sample) => sample.faceCenterY > 0.56).length / Math.max(1, faceSamples.length)
+    : 0;
+  const movement = average(samples.map((sample) => sample.movement));
+  const activeRatio = average(samples.map((sample) => sample.activeRatio));
+  const edgeRatio = average(samples.map((sample) => sample.edgeRatio));
+  const faceStability = faceSamples.length > 2
+    ? average(faceSamples.map((sample) => Math.abs(sample.faceCenterX - average(faceSamples.map((item) => item.faceCenterX)))))
+    : 0;
+  const nervous = movement > 0.028 || activeRatio > 0.08 || edgeRatio > 0.34;
+
+  return {
+    badge: hasFaceApi ? "Live" : "Motion only",
+    lookingAway: hasFaceApi ? (awayRatio > 0.42 ? "Frequent" : awayRatio > 0.22 ? "Sometimes" : "Low") : "Needs Face API",
+    lookingDown: hasFaceApi ? (downRatio > 0.38 ? "Frequent" : downRatio > 0.2 ? "Sometimes" : "Low") : "Needs Face API",
+    nervousMovement: nervous ? "High" : movement > 0.014 ? "Medium" : "Low",
+    facialExpression: hasFaceApi ? (faceStability > 0.08 ? "Unsteady" : "Visible") : "Needs Face API",
+    detail: hasFaceApi
+      ? "Face position and motion are estimated locally from camera frames. Use it as coaching guidance, not medical emotion detection."
+      : "Your browser does not support local face detection, so gaze and expression checks need a Chromium browser with FaceDetector support.",
+  };
+}
+
+function updateBodyLanguageFeedback(result) {
+  if (!result) return;
+  if (els.bodyLanguageBadge) els.bodyLanguageBadge.textContent = result.badge;
+  if (els.lookingAwaySignal) els.lookingAwaySignal.textContent = result.lookingAway;
+  if (els.lookingDownSignal) els.lookingDownSignal.textContent = result.lookingDown;
+  if (els.nervousMovementSignal) els.nervousMovementSignal.textContent = result.nervousMovement;
+  if (els.facialExpressionSignal) els.facialExpressionSignal.textContent = result.facialExpression;
+  if (els.bodyLanguageDetail) els.bodyLanguageDetail.textContent = result.detail;
 }
 
 function average(values) {
@@ -1307,9 +1623,11 @@ function renderReport(session) {
   const report = session.report;
   hydrateReportMistakes(session);
   ensureGameState(report);
+  const interviewReward = ensureShopReward(session);
   const allMistakes = getAllMistakes(report);
   const activeQuest = getActiveQuest(report);
   const totalXp = getPotentialXp(report);
+  const ownedItems = getOwnedShopItems();
   els.reportContent.innerHTML = `
     <section class="panel score-card">
       <div class="score-ring" style="--score:${report.overallScore}%"><span>${report.overallScore}</span></div>
@@ -1321,9 +1639,11 @@ function renderReport(session) {
         <p><strong>Weaknesses:</strong> ${escapeHtml(report.topWeaknesses.join(" ")) || "No major weakness detected."}</p>
         <p><strong>Recommendation:</strong> ${escapeHtml(report.nextPracticeFocus[0] || "Use the STAR method and practice answering within 60-90 seconds.")}</p>
         <button class="primary-btn" type="button" onclick="document.querySelector('[data-view=setup]').click()">Try Again</button>
-        <p class="muted">Generated ${formatDate(report.createdAt)}. ${totalXp} XP available through interview repair quests.</p>
+        <p class="muted">Generated ${formatDate(report.createdAt)}. ${interviewReward} shop points awarded for this interview. ${totalXp} XP available through interview repair quests.</p>
       </div>
     </section>
+
+    ${renderShopPanel(ownedItems)}
 
     <section class="panel">
       <div class="panel-heading">
@@ -1537,6 +1857,12 @@ function renderMistakeDetails(feedback, report) {
 }
 
 function handleReportClick(event) {
+  const buyButton = event.target.closest("[data-shop-item-id]");
+  if (buyButton) {
+    buyShopItem(buyButton.dataset.shopItemId);
+    return;
+  }
+
   const highlight = event.target.closest(".mistake-highlight");
   if (highlight) {
     setActiveQuest(highlight.dataset.mistakeId);
@@ -1553,6 +1879,102 @@ function handleReportClick(event) {
   if (fixedButton) {
     completeActiveQuest(fixedButton.closest(".mistake-detail").dataset.detailId);
   }
+}
+
+function ensureShopReward(session) {
+  if (!session?.report) return 0;
+  const reward = session.report.shopReward || calculateShopReward(session.report.overallScore);
+  session.report.shopReward = reward;
+  state.profile.awardedSessionIds = state.profile.awardedSessionIds || [];
+
+  if (!state.profile.awardedSessionIds.includes(session.id)) {
+    state.profile.balance += reward;
+    state.profile.awardedSessionIds.push(session.id);
+    saveProfile();
+    upsertSession(session);
+  }
+
+  return reward;
+}
+
+function calculateShopReward(overallScore) {
+  const score = Number(overallScore) || 0;
+  const qualityBonus = score >= 85 ? 40 : score >= 70 ? 25 : score >= 55 ? 10 : 0;
+  return 40 + Math.round(score) + qualityBonus;
+}
+
+function renderShopItem(item) {
+  const owned = state.profile.purchases[item.id] || 0;
+  const canBuy = state.profile.balance >= item.cost;
+  const missing = Math.max(0, item.cost - state.profile.balance);
+  return `
+    <article class="shop-item ${canBuy ? "" : "locked"}">
+      <div class="shop-item-top">
+        <span>${escapeHtml(item.badge)}</span>
+        <strong>${item.cost} pts</strong>
+      </div>
+      <h3>${escapeHtml(item.title)}</h3>
+      <p>${escapeHtml(item.description)}</p>
+      <small>${escapeHtml(item.effect)}</small>
+      <div class="shop-status ${canBuy ? "ready" : ""}">
+        ${canBuy ? "Ready to redeem" : `Need ${missing} more points`}
+      </div>
+      <button class="${canBuy ? "primary-btn" : "secondary-btn"}" type="button" data-shop-item-id="${item.id}" ${canBuy ? "" : "disabled"}>
+        ${owned ? `Redeem again (${owned})` : "Redeem"}
+      </button>
+    </article>
+  `;
+}
+
+function renderShopPanel(ownedItems = getOwnedShopItems()) {
+  return `
+    <section class="panel shop-panel">
+      <div class="shop-hero">
+        <div>
+          <p class="eyebrow">Interview rewards shop</p>
+          <h2>Redeem your practice points</h2>
+          <p class="muted">Complete interviews to earn points. Use them for clear practice tools before your next round.</p>
+        </div>
+        <div class="wallet-card">
+          <span>Balance</span>
+          <strong>${state.profile.balance}</strong>
+          <p>points available</p>
+        </div>
+      </div>
+      <div class="shop-grid">
+        ${shopItems.map((item) => renderShopItem(item)).join("")}
+      </div>
+      ${
+        ownedItems.length
+          ? `<div class="owned-rewards"><strong>Owned rewards</strong><p>${ownedItems.map((item) => `${escapeHtml(item.title)} x${state.profile.purchases[item.id]}`).join(" - ")}</p></div>`
+          : `<div class="owned-rewards empty-state">No rewards redeemed yet. Finish interviews and spend points here.</div>`
+      }
+    </section>
+  `;
+}
+
+function renderShop() {
+  if (!els.shopContent) return;
+  els.shopContent.innerHTML = renderShopPanel();
+}
+
+function buyShopItem(itemId) {
+  const item = shopItems.find((entry) => entry.id === itemId);
+  if (!item || state.profile.balance < item.cost) return;
+
+  state.profile.balance -= item.cost;
+  state.profile.purchases[item.id] = (state.profile.purchases[item.id] || 0) + 1;
+  saveProfile();
+
+  if (state.reportSession) {
+    renderReport(state.reportSession);
+  }
+  renderShop();
+  renderDashboard();
+}
+
+function getOwnedShopItems() {
+  return shopItems.filter((item) => state.profile.purchases[item.id]);
 }
 
 function ensureGameState(report) {
@@ -1694,6 +2116,7 @@ function renderDashboard() {
   els.metricSessions.textContent = String(completed.length);
   els.metricAverage.textContent = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : "--";
   els.metricBest.textContent = scores.length ? Math.max(...scores) : "--";
+  if (els.dashboardShopBalance) els.dashboardShopBalance.textContent = String(state.profile.balance);
   renderEnhancedSessionList(els.recentSessions, completed.slice(0, 4));
 
   const overviewLabel = document.querySelector(".overview-panel .eyebrow");
@@ -1792,7 +2215,9 @@ function getCommonMistakes(session) {
 function clearHistory() {
   if (!confirm("Clear all saved interview sessions in this browser?")) return;
   state.sessions = [];
+  state.profile = { balance: 0, purchases: {}, awardedSessionIds: [] };
   saveSessions();
+  saveProfile();
   renderDashboard();
   renderHistory();
 }
@@ -1807,6 +2232,50 @@ function loadSessions() {
 
 function saveSessions() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.sessions));
+}
+
+function loadProfile() {
+  try {
+    const profile = JSON.parse(localStorage.getItem(PROFILE_KEY) || "{}");
+    return {
+      balance: Number(profile.balance) || 0,
+      purchases: profile.purchases && typeof profile.purchases === "object" ? profile.purchases : {},
+      awardedSessionIds: Array.isArray(profile.awardedSessionIds) ? profile.awardedSessionIds : [],
+    };
+  } catch {
+    return {
+      balance: 0,
+      purchases: {},
+      awardedSessionIds: [],
+    };
+  }
+}
+
+function saveProfile() {
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(state.profile));
+}
+
+function loadTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === "dark" || saved === "light") return saved;
+  return "light";
+}
+
+function applyTheme(theme) {
+  const normalized = theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = normalized;
+  if (els.themeToggle) {
+    els.themeToggle.setAttribute("aria-label", normalized === "dark" ? "Switch to light mode" : "Switch to dark mode");
+  }
+  if (els.themeToggleText) {
+    els.themeToggleText.textContent = normalized === "dark" ? "Light" : "Dark";
+  }
+}
+
+function toggleTheme() {
+  state.theme = state.theme === "dark" ? "light" : "dark";
+  localStorage.setItem(THEME_KEY, state.theme);
+  applyTheme(state.theme);
 }
 
 function createId() {

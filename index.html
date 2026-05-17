@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>K-Interview Coach AI</title>
-    <link rel="stylesheet" href="./styles.css?v=7" />
+    <link rel="stylesheet" href="./styles.css?v=16" />
   </head>
   <body>
     <div class="app-shell">
@@ -30,12 +30,21 @@
             <span class="icon">◷</span>
             History
           </button>
+          <button class="nav-item" data-view="shop" type="button">
+            <span class="icon">SP</span>
+            Shop
+          </button>
         </nav>
 
         <div class="sidebar-note">
           <span class="status-dot"></span>
           Local workspace. Interview data is saved in this browser.
         </div>
+
+        <button id="themeToggle" class="theme-toggle" type="button" aria-label="Switch to dark mode">
+          <span class="theme-toggle-track"><span class="theme-toggle-thumb"></span></span>
+          <span id="themeToggleText">Dark</span>
+        </button>
       </aside>
 
       <main class="main">
@@ -112,6 +121,23 @@
                     <span id="dashboardCameraStatus" class="muted">Camera is off.</span>
                   </div>
                 </div>
+              </div>
+            </section>
+
+            <section class="panel dashboard-shop-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Rewards shop</p>
+                  <h2>Spend interview points on practice upgrades.</h2>
+                </div>
+                <button class="secondary-btn" data-view-target="shop" type="button">Open Shop</button>
+              </div>
+              <div class="dashboard-shop-strip">
+                <div>
+                  <span id="dashboardShopBalance">0</span>
+                  <p>points available</p>
+                </div>
+                <p class="muted">Finish interviews to earn points, then redeem answer templates, culture packs, confidence drills, and premium mock scenarios.</p>
               </div>
             </section>
 
@@ -306,6 +332,35 @@
 
               <audio id="answerAudio" controls hidden></audio>
 
+              <section class="analysis-panel voice-analysis-panel" aria-label="Voice analysis">
+                <div class="analysis-heading">
+                  <div>
+                    <p class="eyebrow">Voice analysis</p>
+                    <h3>Speaking performance</h3>
+                  </div>
+                  <span id="voiceConfidenceBadge" class="analysis-badge">Waiting</span>
+                </div>
+                <div class="analysis-grid">
+                  <div class="analysis-item">
+                    <span>Speaking speed</span>
+                    <strong id="speakingSpeed">-- WPM</strong>
+                    <p id="speakingSpeedFeedback">Record your answer to calculate words per minute.</p>
+                  </div>
+                  <div class="analysis-item">
+                    <span>Volume</span>
+                    <strong id="voiceVolume">--</strong>
+                    <div class="analysis-meter"><i id="voiceVolumeMeter"></i></div>
+                    <p id="voiceVolumeFeedback">Microphone volume will appear while recording.</p>
+                  </div>
+                  <div class="analysis-item">
+                    <span>Confidence level</span>
+                    <strong id="voiceConfidence">--</strong>
+                    <div class="analysis-meter"><i id="voiceConfidenceMeter"></i></div>
+                    <p id="voiceConfidenceFeedback">Confidence combines pace, volume, filler words, and answer length.</p>
+                  </div>
+                </div>
+              </section>
+
               <section class="camera-coach interview-camera" aria-label="Camera body language coach">
                 <div class="camera-preview-wrap">
                   <video id="cameraPreview" autoplay playsinline muted hidden></video>
@@ -338,6 +393,34 @@
                       <strong id="gestureFeedback">Turn on camera to get movement feedback.</strong>
                       <p id="gestureDetail" class="muted">The coach estimates gesture rhythm from local camera frames.</p>
                     </div>
+                  </div>
+                  <div class="analysis-panel body-analysis-panel" aria-label="Emotion and body language analysis">
+                    <div class="analysis-heading">
+                      <div>
+                        <p class="eyebrow">Emotion & body language analysis</p>
+                        <h3>Camera signals</h3>
+                      </div>
+                      <span id="bodyLanguageBadge" class="analysis-badge">Camera off</span>
+                    </div>
+                    <div class="body-signal-list">
+                      <div class="body-signal">
+                        <span>Looking away frequently</span>
+                        <strong id="lookingAwaySignal">--</strong>
+                      </div>
+                      <div class="body-signal">
+                        <span>Looking down too much</span>
+                        <strong id="lookingDownSignal">--</strong>
+                      </div>
+                      <div class="body-signal">
+                        <span>Nervous hand movements</span>
+                        <strong id="nervousMovementSignal">--</strong>
+                      </div>
+                      <div class="body-signal">
+                        <span>Facial expressions</span>
+                        <strong id="facialExpressionSignal">--</strong>
+                      </div>
+                    </div>
+                    <p id="bodyLanguageDetail" class="muted">Turn on camera to start local body language analysis.</p>
                   </div>
                 </div>
               </section>
@@ -378,9 +461,20 @@
           </header>
           <div id="historyList" class="session-list"></div>
         </section>
+
+        <section id="shopView" class="view">
+          <header class="topbar compact">
+            <div>
+              <p class="eyebrow">Rewards shop</p>
+              <h1>Interview points store</h1>
+            </div>
+            <button class="primary-btn" data-view-target="setup" type="button">Earn Points</button>
+          </header>
+          <div id="shopContent" class="report-layout"></div>
+        </section>
       </main>
     </div>
 
-    <script src="./app.js?v=7"></script>
+    <script src="./app.js?v=16"></script>
   </body>
 </html>
