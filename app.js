@@ -319,7 +319,7 @@ function renderQuestion() {
 
   resetVoiceState();
   stopQuestionTimer();
-  els.sessionMeta.textContent = `${styleLabels[session.targetStyle]} • ${session.seniority} • ${session.roleTitle}`;
+  els.sessionMeta.textContent = `${styleLabels[session.targetStyle]} - ${session.seniority} - ${session.roleTitle}`;
   els.questionTitle.textContent = `Question ${number}`;
   els.progressText.textContent = `${number}/${total}`;
   els.progressBar.style.width = `${(number / total) * 100}%`;
@@ -1314,7 +1314,7 @@ function renderReport(session) {
     <section class="panel score-card">
       <div class="score-ring" style="--score:${report.overallScore}%"><span>${report.overallScore}</span></div>
       <div>
-        <p class="eyebrow">${styleLabels[session.targetStyle]} • ${session.roleTitle}</p>
+        <p class="eyebrow">${styleLabels[session.targetStyle]} - ${session.roleTitle}</p>
         <h2>Overall Score: ${report.overallScore}/100</h2>
         <p class="muted">${report.summary}</p>
         <p><strong>Strengths:</strong> ${escapeHtml(report.topStrengths.join(" ")) || "Keep practicing to reveal strengths."}</p>
@@ -1385,7 +1385,7 @@ function renderReport(session) {
         const feedback = report.answerFeedback.find((item) => item.questionId === question.id);
         return `
           <article class="feedback-card">
-            <p class="eyebrow">Question ${index + 1} • ${question.questionType.replace("_", " ")}</p>
+            <p class="eyebrow">Question ${index + 1} - ${question.questionType.replace("_", " ")}</p>
             <h2>${escapeHtml(question.questionText)}</h2>
             <div class="transcript-review">
               <div class="review-heading">
@@ -1716,7 +1716,7 @@ function renderSessionList(container, sessions) {
         <article class="session-item">
           <div>
             <h3>${escapeHtml(session.roleTitle)}</h3>
-            <p>${styleLabels[session.targetStyle]} • ${formatDate(session.createdAt)}</p>
+            <p>${styleLabels[session.targetStyle]} - ${formatDate(session.createdAt)}</p>
           </div>
           <button class="secondary-btn" type="button" data-session-id="${session.id}">View Report</button>
         </article>
